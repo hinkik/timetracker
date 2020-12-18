@@ -1,32 +1,58 @@
-let activeTab = null
-let firefoxActive = true
-let currentDomain = null
+let updateInterval = 2000
 const tracked = new Map()
 
-function handleUpdate(url) {
-    const domain = (new URL(url)).hostname
-    if (domain !== currentDomain) {
-        console.log("Hello, you just updated tab: " + domain);
-        currentDomain = domain
+const state = {
+    browserActive: true,
+    currentDomain: null,
+    startTime: null
+}
+
+function addTimeTracked(domain, endTime) {
+    tracked.set(domain, 
+        (endTime - state.startTime) + (tracked.get(domain) || 0)
+    )
+}
+
+function setActive(isActive) {
+    if (state.browserActive !== isActive) {
+        if (isActive) {
+            console.log("Going active");
+            state.startTime = new Date()
+        } else {
+            console.log("Going idle");
+            addTimeTracked(state.currentDomain, new Date())
+        }
+        state.browserActive = isActive
     }
 }
 
-browser.tabs.onActivated.addListener(tab => {
-    activeTab = tab.tabId
-    browser.tabs.get(tab.tabId).then(tabInfo => {
-        handleUpdate(tabInfo.url)
-    })
-})
+function handleUpdate(url) {
+    const domain = (new URL(url)).hostname || "nonsite"
+    if (domain === state.currentDomain) {
+        return
+    }
+    const endTime = new Date()
 
-browser.tabs.onUpdated.addListener(
-    (tabId, changeInfo, tabInfo) => {
-    changeInfo.status === "complete" &&
-    activeTab === tabId && handleUpdate(tabInfo.url)
-})
+    if (state.currentDomain) {
+        addTimeTracked(state.currentDomain, endTime)
+    }
+    
+    state.currentDomain = domain
+    console.log("Current tab: " + domain);
+    state.startTime = endTime
+}
+
+setInterval(() => {
+    state.browserActive && browser.tabs.query({currentWindow: true, active: true})
+    .then(tabs => { tabs && handleUpdate(tabs[0].url) })
+}, updateInterval)
 
 browser.windows.onFocusChanged.addListener(windowId => {
-    firefoxActive = !(windowId === -1)
+    setActive(!(windowId === -1))
 })
 
-// Need to set activeTab on startup
-// Handle window changes
+browser.idle.onStateChanged.addListener(idleState => {
+    setActive(idleState === "active")
+})
+
+browser.idle.setDetectionInterval(15)
