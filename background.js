@@ -2,6 +2,10 @@ class Timer {
     constructor() {
         this.updateInterval = 1000
         this.timedata = new Map()
+        this.state = {}
+    }
+
+    init() {
         this.state = {
             currentDomain: null,
             timestamp: null,
@@ -10,9 +14,7 @@ class Timer {
             browserActive: true,
             idle: false
         }
-    }
 
-    init() {
         getActiveDomain().then(domain => {
             this.state.currentDomain = domain
             this.startTimer()
@@ -21,7 +23,6 @@ class Timer {
             }, this.updateInterval)
             console.log("Timer initialized. Domain: " + domain);
         })
-        
     }
 
     halt() {
@@ -105,7 +106,7 @@ browser.idle.onStateChanged.addListener(idleState => {
 browser.runtime.onMessage.addListener((req, sender, sendRes) => {
     sendRes({
         domain: timer.state.currentDomain,
-        time: timer.currentTime() / 1000
+        time: timer.currentTime()
     })
 })
 
