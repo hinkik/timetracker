@@ -1,85 +1,111 @@
-let updateInterval = 1000
-const tracked = new Map()
+class Timer {
+    constructor() {
+        this.updateInterval = 1000
+        this.timedata = new Map()
+        this.state = {
+            currentDomain: null,
+            timestamp: null,
+            intervalId: null,
+            windowActive: true,
+            browserActive: true,
+            idle: false
+        }
+    }
 
-let state = resetState()
+    init() {
+        getActiveDomain().then(domain => {
+            this.state.currentDomain = domain
+            this.startTimer()
+            this.state.intervalId = setInterval(() => {
+                getActiveDomain().then(domain => this.updateDomain(domain))
+            }, this.updateInterval)
+            console.log("Timer initialized. Domain: " + domain);
+        })
+        
+    }
 
-function currentTime(domain) {
-    const trackedTime = tracked.get(domain) || 0
-    const untrackedTime = (new Date() - state.oldTime) || 0
-    return trackedTime + untrackedTime
-}
+    halt() {
+        this.stopTimer()
+        clearInterval(this.state.intervalId)
+        console.log("Timer halted");
+    }
 
-function resetState() {
-    return {
-        id: 0,
-        windowActive: true,
-        notIdle: true,
-        currentDomain: null,
-        oldTime: null
+    onIdle() {
+        this.stopTimer()
+        this.state.idle = true
+        console.log("In idle mode");
+    }
+
+    onActive() {
+        getActiveDomain().then(domain => {
+            this.state.currentDomain = domain
+            this.state.idle = false
+            this.startTimer()
+        })
+        console.log("In active mode");
+    }
+
+    updateDomain(domain) {
+        if (this.state.currentDomain !== domain) {
+            this.stopTimer()
+            this.startTimer()
+            this.state.currentDomain = domain
+            console.log("Domain change to: " + domain);
+        }
+    }
+
+    stopTimer() {
+        if (this.state.currentDomain) {
+            const acctime = this.timedata.get(this.state.currentDomain) || 0
+            const newtime = new Date() - this.state.timestamp
+            this.timedata.set(this.state.currentDomain, acctime + newtime)
+            console.log("Timer stopped: ");
+            console.log(this.timedata);
+        }
+    }
+
+    startTimer() {
+        this.state.timestamp = new Date()
+        console.log("Timer started. New timestamp.");
+    }
+
+    currentTime() {
+        const aggtime = this.timedata.get(this.state.currentDomain) || 0
+        const newtime = (new Date() - this.state.timestamp) || 0
+        return aggtime + newtime
     }
 }
 
-function updateTrackingData(domain, newTime) {
-    domain && tracked.set(domain,
-        (newTime - state.oldTime) + (tracked.get(domain) || 0)
-    )
-    domain && console.log(tracked);
+function getActiveDomain() {
+    return browser.tabs.query({currentWindow: true, active: true})
+    .then(tabs => (new URL(tabs[0].url)).hostname || "nonsite")
 }
 
-function update(url) {
-    const domain = (new URL(url)).hostname || "nonsite"
-    console.log("state id: " + state.id);
-    const newTime = new Date()
-    
-    switch (state.id) {
-        case 0: // initial state
-            state.currentDomain = domain
-            state.oldTime = newTime
-            state.id = 1
-            break
-        case 1: // tracking state
-            if (state.currentDomain !== domain) {
-                updateTrackingData(state.currentDomain, newTime)
-                state.currentDomain = domain
-                state.oldTime = newTime
-            }
-            break
-        case 2: // Going idle state
-            updateTrackingData(state.currentDomain, newTime)
-            state.id = 3
-            // intentionally avoid break
-        case 3: // idle state
-            if (state.windowActive && state.notIdle) {
-                state.oldTime = newTime
-                state.id = 1
-            }
-            break
-    }
-}
-
-setInterval(() => {
-    browser.tabs.query({currentWindow: true, active: true})
-    .then(tabs => { tabs && update(tabs[0].url) })
-}, updateInterval)
+const timer = new Timer()
+timer.init()
 
 browser.windows.onFocusChanged.addListener(windowId => {
-    state.windowActive = !(windowId === -1)
-    if (!state.windowActive) {
-        state.id = 2
+    timer.state.windowActive = !(windowId === -1)
+    if (!timer.state.windowActive) {
+        timer.onIdle()
+    } else if (timer.state.idle && timer.state.browserActive) {
+        timer.onActive()
     }
 })
 
 browser.idle.onStateChanged.addListener(idleState => {
-    state.notIdle = idleState === "active"
-    if (!state.notIdle) {
-        state.id = 2
+    timer.state.browserActive = idleState === "active"
+    if (!timer.state.windowActive) {
+        timer.onIdle()
+    } else if (timer.state.idle && timer.state.windowActive) {
+        timer.onActive()
     }
 })
 
 browser.runtime.onMessage.addListener((req, sender, sendRes) => {
     sendRes({
-        domain: state.currentDomain,
-        time: currentTime(state.currentDomain) / 1000
+        domain: timer.state.currentDomain,
+        time: timer.currentTime() / 1000
     })
 })
 
