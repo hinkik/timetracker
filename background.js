@@ -1,13 +1,14 @@
 class Timer {
     constructor() {
-        this.updateInterval = 1000
-	    this.saveInterval = 10000
+        this.updateInterval = 5000 // in milliseconds
+	    this.saveInterval = 60000 // in milliseconds
         this.timedata = new Map()
         this.state = {}
+        this.archive = []
     }
 
     load() {
-        return browser.storage.local.get(null).then(data => {
+        return browser.storage.local.get(["timearray", "date"]).then(data => {
             if (data.timearray && this.state.today === data.date) {
                 this.timedata = data.timearray.reduce((mem, row) => {
                     mem.set(row.domain, row.seconds * 1000)
@@ -47,22 +48,38 @@ class Timer {
         })
     }
 
+    getArchive() {
+        return browser.storage.local.get("archive").then(data => {
+            const archive = (data.archive || []).push({
+                timearray: timemap2timearray(this.timedata),
+                date: this.state.today.toLocaleDateString()
+            })
+            return archive
+        })
+    }
+
     save() {
-        if (this.state.today !== this.state.timestamp.toLocaleDateString()) {
-            this.timedata = new Map()
-            this.state.today = this.state.timestamp.toLocaleDateString()
+        const timearray = timemap2timearray(this.timedata)
+
+        if (this.state.today === this.state.timestamp.toLocaleDateString()) {
+            return browser.storage.local.set({
+                timearray,
+                date: this.state.today
+            })
+        } else {
+            return browser.storage.local.get("archive").then(data => {
+                const archive = data.archive || []
+                archive.push({
+                    timearray,
+                    date: this.state.today
+                })
+                this.state.today = this.state.timestamp.toLocaleDateString()
+                this.timedata = new Map()
+                return browser.storage.local.set({
+                    archive
+                })
+            })
         }
-
-        const timearray = []
-
-        this.timedata.forEach((ms, domain) => {
-            timearray.push({seconds: Math.floor(ms / 1000), domain})
-        })
-
-        return browser.storage.local.set({
-            timearray,
-            date: this.state.today
-        })
     }
 
     halt() {
@@ -118,11 +135,21 @@ class Timer {
     }
 }
 
+function timemap2timearray(timedata) {
+    const timearray = []
+
+    timedata.forEach((ms, domain) => {
+        timearray.push({seconds: Math.floor(ms / 1000), domain})
+    })
+    return timearray
+}
+
 function getActiveDomain() {
     return browser.tabs.query({currentWindow: true, active: true})
     .then(tabs => (new URL(tabs[0].url)).hostname || "nonsite")
 }
 
+let wowie = true
 const timer = new Timer()
 timer.init()
 
@@ -151,4 +178,4 @@ browser.runtime.onMessage.addListener((req, sender, sendRes) => {
     })
 })
 
-browser.idle.setDetectionInterval(1800)
+browser.idle.setDetectionInterval(1800) // in seconds
