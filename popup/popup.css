@@ -1,0 +1,25 @@
+* {
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    font-family: sans-serif;
+    background-color:#3b4252;
+    color: #eceff4;
+}
+
+.container {
+    min-width: 200px;
+    margin: 15px;
+}
+
+#time {
+    font-family: monospace;
+    text-align: center;
+    color: #81a1c1;
+}
+
+#domain {
+    text-align: center;
+}

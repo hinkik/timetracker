@@ -1,4 +1,5 @@
 const time = document.getElementById("time")
+const domain = document.getElementById("domain")
 
 function ms2HoursMinutes(ms) {
     const seconds = ms / 1000
@@ -14,7 +15,8 @@ function ms2HoursMinutes(ms) {
 function refreshTime() {
     return browser.runtime.sendMessage({})
     .then(resp => {
-        time.innerHTML = resp.domain + " " + ms2HoursMinutes(resp.time)
+        time.innerHTML = ms2HoursMinutes(resp.time)
+        domain.innerHTML = resp.domain
     })
 }
 

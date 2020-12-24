@@ -1,33 +1,74 @@
 class Timer {
     constructor() {
         this.updateInterval = 1000
+	    this.saveInterval = 10000
         this.timedata = new Map()
         this.state = {}
+    }
+
+    load() {
+        return browser.storage.local.get(null).then(data => {
+            if (data.timearray && this.state.today === data.date) {
+                this.timedata = data.timearray.reduce((mem, row) => {
+                    mem.set(row.domain, row.seconds * 1000)
+                    return mem
+                }, new Map())
+                console.log("Loaded previous time data.");
+            }
+            
+        })
     }
 
     init() {
         this.state = {
             currentDomain: null,
             timestamp: null,
-            intervalId: null,
+            updateIntervalId: null,
+            saveIntervalId: null,
             windowActive: true,
             browserActive: true,
-            idle: false
+            idle: false,
+            today: (new Date()).toLocaleDateString()
         }
 
-        getActiveDomain().then(domain => {
-            this.state.currentDomain = domain
-            this.startTimer()
-            this.state.intervalId = setInterval(() => {
-                getActiveDomain().then(domain => this.updateDomain(domain))
-            }, this.updateInterval)
-            console.log("Timer initialized. Domain: " + domain);
+        this.load().then(res => {
+            getActiveDomain().then(domain => {
+                this.state.currentDomain = domain
+                this.startTimer()
+                this.state.updateIntervalId = setInterval(() => {
+                    getActiveDomain().then(domain => this.update(domain))
+                }, this.updateInterval)
+                this.state.saveIntervalId = setInterval(() => {
+                    this.state.idle || this.save().then(res => console.log("Saved time data"))
+                    .catch(err => console.log(err))
+                }, this.saveInterval)
+                console.log("Timer initialized. Domain: " + domain);
+            })
+        })
+    }
+
+    save() {
+        if (this.state.today !== this.state.timestamp.toLocaleDateString()) {
+            this.timedata = new Map()
+            this.state.today = this.state.timestamp.toLocaleDateString()
+        }
+
+        const timearray = []
+
+        this.timedata.forEach((ms, domain) => {
+            timearray.push({seconds: Math.floor(ms / 1000), domain})
+        })
+
+        return browser.storage.local.set({
+            timearray,
+            date: this.state.today
         })
     }
 
     halt() {
         this.stopTimer()
-        clearInterval(this.state.intervalId)
+        clearInterval(this.state.updateIntervalId)
+        clearInterval(this.state.saveIntervalId)
         console.log("Timer halted");
     }
 
@@ -46,7 +87,7 @@ class Timer {
         console.log("In active mode");
     }
 
-    updateDomain(domain) {
+    update(domain) {
         if (this.state.currentDomain !== domain) {
             this.stopTimer()
             this.startTimer()

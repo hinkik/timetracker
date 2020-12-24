@@ -10,11 +10,12 @@
 
     "permissions": [
         "tabs",
-        "idle"
+        "idle",
+	"storage"
     ],
 
     "browser_action": {
-        "default_icon": "icons/beasts-32.png",
+        "default_icon": "icons/hourglass-32.png",
         "default_title": "Time tracker",
         "default_popup": "popup/popup.html"
     }
