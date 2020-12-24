@@ -10,7 +10,7 @@ html, body {
 }
 
 .container {
-    min-width: 200px;
+    min-width: 300px;
     margin: 15px;
 }
 
@@ -22,4 +22,31 @@ html, body {
 
 #domain {
     text-align: center;
+}
+
+.table {
+    overflow: auto;
+    max-height: 400px;
+    scrollbar-width: none;
+}
+
+#timetable {
+    margin-top: 5px;
+    border-collapse: collapse;
+    width: 100%;
+    font-size: small;
+}
+
+#timetable td, #timetable th {
+    padding: 8px;
+  }
+
+#timetable tr:nth-child(even){
+    background-color: #434c5e;
+}
+
+#timetable th {
+    text-align: left;
+    font-size: smaller;
+    color: #d8dee9;
 }

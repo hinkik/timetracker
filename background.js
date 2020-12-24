@@ -1,6 +1,6 @@
 class Timer {
     constructor() {
-        this.updateInterval = 5000 // in milliseconds
+        this.updateInterval = 1000 // in milliseconds
 	    this.saveInterval = 60000 // in milliseconds
         this.timedata = new Map()
         this.state = {}
@@ -172,10 +172,17 @@ browser.idle.onStateChanged.addListener(idleState => {
 })
 
 browser.runtime.onMessage.addListener((req, sender, sendRes) => {
-    sendRes({
-        domain: timer.state.currentDomain,
-        time: timer.currentTime()
-    })
+    if (req.request === "activeTab") {
+        sendRes({
+            domain: timer.state.currentDomain,
+            time: timer.currentTime()
+        })
+    } else if (req.request === "today") {
+        sendRes({
+            today: timemap2timearray(timer.timedata)
+        })
+    }
+    
 })
 
 browser.idle.setDetectionInterval(1800) // in seconds

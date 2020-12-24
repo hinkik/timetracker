@@ -1,5 +1,10 @@
 const time = document.getElementById("time")
 const domain = document.getElementById("domain")
+const timetable = document.getElementById("timetable")
+
+let currentTime = null
+let currentDomain = null
+let currentTableEntry = null
 
 function ms2HoursMinutes(ms) {
     const seconds = ms / 1000
@@ -13,15 +18,55 @@ function ms2HoursMinutes(ms) {
 }
 
 function refreshTime() {
-    return browser.runtime.sendMessage({})
+    return browser.runtime.sendMessage({request: "activeTab"})
     .then(resp => {
-        time.innerHTML = ms2HoursMinutes(resp.time)
         domain.innerHTML = resp.domain
+        currentTime = resp.time
+        time.innerHTML = ms2HoursMinutes(resp.time)
+        currentDomain = resp.domain
+        return true
+    })
+}
+
+function newRow(domain, time) {
+    const row = document.createElement("tr")
+    const domaincell = document.createElement("td")
+    const timecell = document.createElement("td")
+    domaincell.innerHTML = domain
+    timecell.innerHTML = time
+    row.append(domaincell)
+    row.append(timecell)
+    timetable.appendChild(row)
+    return timecell
+}
+
+function getToday() {
+    return browser.runtime.sendMessage({request: "today"})
+    .then(resp => {
+        const timearray = resp.today || []
+
+        console.log(timearray);
+
+        timearray.sort((a, b) => b.seconds - a.seconds)
+        
+        timearray.forEach(d => {
+            if (d.domain !== currentDomain) {
+                newRow(d.domain, ms2HoursMinutes(d.seconds * 1000))
+            } else {
+                currentTableEntry = newRow(currentDomain, ms2HoursMinutes(currentTime))
+            }
+        })
     })
 }
 
 refreshTime().then(() => {
-    setInterval(() => {
-        refreshTime()
-    }, 1000)
+    getToday().then(() => {
+        setInterval(() => {
+            currentTime += 1000
+            time.innerHTML = ms2HoursMinutes(currentTime)
+            if (currentTableEntry) {
+                currentTableEntry.innerHTML = time.innerHTML
+            }
+        }, 1000)
+    })
 })
