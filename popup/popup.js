@@ -45,8 +45,6 @@ function getToday() {
     .then(resp => {
         const timearray = resp.today || []
 
-        console.log(timearray);
-
         timearray.sort((a, b) => b.seconds - a.seconds)
         
         timearray.forEach(d => {

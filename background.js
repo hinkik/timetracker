@@ -52,7 +52,7 @@ class Timer {
         return browser.storage.local.get("archive").then(data => {
             const archive = (data.archive || []).push({
                 timearray: timemap2timearray(this.timedata),
-                date: this.state.today.toLocaleDateString()
+                date: this.state.today
             })
             return archive
         })
