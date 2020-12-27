@@ -16,10 +16,14 @@ class Timer {
     }
 
     load() {
-        return browser.storage.local.get(null).then(data => {
+        return browser.storage.local.get([
+            "timearray", "date", "settings", "siteconfigsarray"
+        ]).then(data => {
             if (data.timearray && this.state.today === data.date) {
                 this.timedata = data.timearray.reduce((mem, row) => {
-                    mem.set(row.domain, row.seconds * 1000)
+                    const ms = row.seconds * 1000
+                    mem.set(row.domain, ms)
+                    this.state.timeSpentToday += ms
                     return mem
                 }, new Map())
                 console.log("Loaded previous time data.");
@@ -41,7 +45,8 @@ class Timer {
             windowActive: true,
             browserActive: true,
             idle: false,
-            today: (new Date()).toLocaleDateString()
+            today: (new Date()).toLocaleDateString(),
+            timeSpentToday: 0
         }
 
         this.load().then(res => {
@@ -139,6 +144,7 @@ class Timer {
             const acctime = this.timedata.get(this.state.currentDomain) || 0
             const newtime = new Date() - this.state.timestamp
             this.timedata.set(this.state.currentDomain, acctime + newtime)
+            this.state.timeSpentToday += newtime
             console.log("Timer stopped: ");
             console.log(this.timedata);
         }
@@ -166,12 +172,12 @@ function timemap2timearray(timedata) {
 }
 
 function siteconfigs2siteconfigsarray(siteconfigs) {
-    const siteconfigarray = []
+    const siteconfigsarray = []
 
     siteconfigs.forEach((settings, domain) => {
-        siteconfigarray.push({settings, domain})
+        siteconfigsarray.push({settings, domain})
     })
-    return siteconfigarray
+    return siteconfigsarray
 }
 
 function getActiveDomain() {
@@ -207,7 +213,8 @@ browser.runtime.onMessage.addListener((req, sender, sendRes) => {
             currentDomain: timer.state.currentDomain,
             currentTime: timer.currentTime(),
             timearray: timemap2timearray(timer.timedata),
-            siteconfig: timer.siteconfigs.get(timer.state.currentDomain)
+            siteconfig: timer.siteconfigs.get(timer.state.currentDomain),
+            timeSpentToday: timer.state.timeSpentToday
         })
     } else if (req.request === "updateSiteConfigs") {
         timer.siteconfigs.set(req.currentDomain, req.settings)

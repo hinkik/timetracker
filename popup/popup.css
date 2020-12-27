@@ -47,10 +47,10 @@ hr {
     overflow: auto;
     max-height: 400px;
     scrollbar-width: none;
+    margin: 5px 0px 5px 0px;
 }
 
 #timetable {
-    margin-top: 5px;
     border-collapse: collapse;
     width: 100%;
     font-size: small;
@@ -68,4 +68,10 @@ hr {
     text-align: left;
     font-size: smaller;
     color: #d8dee9;
+}
+
+.totaltimearea {
+    margin-top: 15px;
+    display: flex;
+    justify-content: space-between;
 }

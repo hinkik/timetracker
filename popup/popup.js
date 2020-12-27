@@ -2,10 +2,12 @@ const time = document.getElementById("time")
 const domain = document.getElementById("domain")
 const timetable = document.getElementById("timetable")
 const idleIgnoreButton = document.getElementById("idleIgnore")
+const timeSpentTodayElement = document.getElementById("timeSpentToday")
 
 let currentTime = null
 let currentDomain = null
 let currentTableEntry = null
+let timeSpentToday = 0
 
 function ms2HoursMinutes(ms) {
     const seconds = ms / 1000
@@ -47,6 +49,8 @@ browser.runtime.sendMessage({request: "init"}).then(resp => {
     currentTime = resp.currentTime
     time.innerText = ms2HoursMinutes(resp.currentTime)
     currentDomain = resp.currentDomain
+    timeSpentToday = resp.timeSpentToday
+    timeSpentTodayElement.innerText = ms2HoursMinutes(timeSpentToday)
 
     setTimetable(resp.timearray || [])
     
@@ -57,6 +61,8 @@ browser.runtime.sendMessage({request: "init"}).then(resp => {
     return setInterval(() => {
         currentTime += 1000
         time.innerText = ms2HoursMinutes(currentTime)
+        timeSpentToday += 1000
+        timeSpentTodayElement.innerText = ms2HoursMinutes(timeSpentToday)
         if (currentTableEntry) {
             currentTableEntry.innerText = time.innerText
         }
