@@ -1,6 +1,7 @@
 const time = document.getElementById("time")
 const domain = document.getElementById("domain")
 const timetable = document.getElementById("timetable")
+const idleIgnoreButton = document.getElementById("idleIgnore")
 
 let currentTime = null
 let currentDomain = null
@@ -17,54 +18,57 @@ function ms2HoursMinutes(ms) {
     return f(String(h)) + ":" + f(String(m)) + ":" + f(String(s))
 }
 
-function refreshTime() {
-    return browser.runtime.sendMessage({request: "activeTab"})
-    .then(resp => {
-        domain.innerHTML = resp.domain
-        currentTime = resp.time
-        time.innerHTML = ms2HoursMinutes(resp.time)
-        currentDomain = resp.domain
-        return true
-    })
-}
-
 function newRow(domain, time) {
     const row = document.createElement("tr")
     const domaincell = document.createElement("td")
     const timecell = document.createElement("td")
-    domaincell.innerHTML = domain
-    timecell.innerHTML = time
+    domaincell.innerText = domain
+    timecell.innerText = time
     row.append(domaincell)
     row.append(timecell)
     timetable.appendChild(row)
     return timecell
 }
 
-function getToday() {
-    return browser.runtime.sendMessage({request: "today"})
-    .then(resp => {
-        const timearray = resp.today || []
+function setTimetable(timearray) {
+    timearray.sort((a, b) => b.seconds - a.seconds)
 
-        timearray.sort((a, b) => b.seconds - a.seconds)
-        
-        timearray.forEach(d => {
-            if (d.domain !== currentDomain) {
-                newRow(d.domain, ms2HoursMinutes(d.seconds * 1000))
-            } else {
-                currentTableEntry = newRow(currentDomain, ms2HoursMinutes(currentTime))
-            }
-        })
+    timearray.forEach(d => {
+        if (d.domain !== currentDomain) {
+            newRow(d.domain, ms2HoursMinutes(d.seconds * 1000))
+        } else {
+            currentTableEntry = newRow(currentDomain, ms2HoursMinutes(currentTime))
+        }
     })
 }
 
-refreshTime().then(() => {
-    getToday().then(() => {
-        setInterval(() => {
-            currentTime += 1000
-            time.innerHTML = ms2HoursMinutes(currentTime)
-            if (currentTableEntry) {
-                currentTableEntry.innerHTML = time.innerHTML
-            }
-        }, 1000)
+browser.runtime.sendMessage({request: "init"}).then(resp => {
+    domain.innerText = resp.currentDomain
+    currentTime = resp.currentTime
+    time.innerText = ms2HoursMinutes(resp.currentTime)
+    currentDomain = resp.currentDomain
+
+    setTimetable(resp.timearray || [])
+    
+    if (resp.siteconfig) {
+        idleIgnoreButton.checked = resp.siteconfig.idleIgnore
+    }
+
+    return setInterval(() => {
+        currentTime += 1000
+        time.innerText = ms2HoursMinutes(currentTime)
+        if (currentTableEntry) {
+            currentTableEntry.innerText = time.innerText
+        }
+    }, 1000)
+})
+
+idleIgnoreButton.addEventListener("change", (e) => {
+    browser.runtime.sendMessage({
+        request: "updateSiteConfigs",
+        currentDomain: currentDomain,
+        settings: {
+            idleIgnore: e.target.checked
+        }
     })
 })

@@ -1,14 +1,22 @@
 class Timer {
     constructor() {
         this.updateInterval = 1000 // in milliseconds
-	    this.saveInterval = 60000 // in milliseconds
+        this.saveInterval = 60000 // in milliseconds
+        this.siteconfigs = new Map()
         this.timedata = new Map()
         this.state = {}
         this.archive = []
     }
 
+    updateSettings(settings) {
+        console.log("Updated settings");
+        this.updateInterval = settings.updateInterval || 5000
+        this.saveInterval = settings.updateInterval || 60000
+        browser.idle.setDetectionInterval(settings.time2Idle || 300) // in seconds
+    }
+
     load() {
-        return browser.storage.local.get(["timearray", "date"]).then(data => {
+        return browser.storage.local.get(null).then(data => {
             if (data.timearray && this.state.today === data.date) {
                 this.timedata = data.timearray.reduce((mem, row) => {
                     mem.set(row.domain, row.seconds * 1000)
@@ -16,7 +24,11 @@ class Timer {
                 }, new Map())
                 console.log("Loaded previous time data.");
             }
-            
+            data.settings && this.updateSettings(data.settings)
+            this.siteconfigs = (data.siteconfigsarray || []).reduce((mem, site) => {
+                mem.set(site.domain, {...site.settings})
+                return mem
+            }, new Map())
         })
     }
 
@@ -90,18 +102,27 @@ class Timer {
     }
 
     onIdle() {
-        this.stopTimer()
-        this.state.idle = true
-        console.log("In idle mode");
+        if (this.siteconfigs.has(this.state.currentDomain) &&
+            this.siteconfigs.get(this.state.currentDomain).idleIgnore
+        ) {
+            return
+        }
+        if (!this.state.idle) {
+            this.stopTimer()
+            this.state.idle = true
+            console.log("In idle mode");
+        }
     }
 
     onActive() {
-        getActiveDomain().then(domain => {
-            this.state.currentDomain = domain
-            this.state.idle = false
-            this.startTimer()
-        })
-        console.log("In active mode");
+        if (this.state.idle) {
+            getActiveDomain().then(domain => {
+                this.state.currentDomain = domain
+                this.state.idle = false
+                this.startTimer()
+            })
+            console.log("In active mode");
+        }
     }
 
     update(domain) {
@@ -144,12 +165,20 @@ function timemap2timearray(timedata) {
     return timearray
 }
 
+function siteconfigs2siteconfigsarray(siteconfigs) {
+    const siteconfigarray = []
+
+    siteconfigs.forEach((settings, domain) => {
+        siteconfigarray.push({settings, domain})
+    })
+    return siteconfigarray
+}
+
 function getActiveDomain() {
     return browser.tabs.query({currentWindow: true, active: true})
     .then(tabs => (new URL(tabs[0].url)).hostname || "nonsite")
 }
 
-let wowie = true
 const timer = new Timer()
 timer.init()
 
@@ -163,8 +192,9 @@ browser.windows.onFocusChanged.addListener(windowId => {
 })
 
 browser.idle.onStateChanged.addListener(idleState => {
+    console.log("Browser state changed to : " + idleState);
     timer.state.browserActive = idleState === "active"
-    if (!timer.state.windowActive) {
+    if (!timer.state.browserActive) {
         timer.onIdle()
     } else if (timer.state.idle && timer.state.windowActive) {
         timer.onActive()
@@ -172,17 +202,17 @@ browser.idle.onStateChanged.addListener(idleState => {
 })
 
 browser.runtime.onMessage.addListener((req, sender, sendRes) => {
-    if (req.request === "activeTab") {
+    if (req.request === "init") {
         sendRes({
-            domain: timer.state.currentDomain,
-            time: timer.currentTime()
+            currentDomain: timer.state.currentDomain,
+            currentTime: timer.currentTime(),
+            timearray: timemap2timearray(timer.timedata),
+            siteconfig: timer.siteconfigs.get(timer.state.currentDomain)
         })
-    } else if (req.request === "today") {
-        sendRes({
-            today: timemap2timearray(timer.timedata)
+    } else if (req.request === "updateSiteConfigs") {
+        timer.siteconfigs.set(req.currentDomain, req.settings)
+        browser.storage.local.set({
+            siteconfigsarray: siteconfigs2siteconfigsarray(timer.siteconfigs)
         })
     }
-    
 })
-
-browser.idle.setDetectionInterval(1800) // in seconds
