@@ -19,15 +19,22 @@ class Timer {
         return browser.storage.local.get([
             "timearray", "date", "settings", "siteconfigsarray"
         ]).then(data => {
-            if (data.timearray && this.state.today === data.date) {
-                this.timedata = data.timearray.reduce((mem, row) => {
+            if (data.timearray && data.timearray.length > 0) {
+                const timedata = data.timearray.reduce((mem, row) => {
                     const ms = row.seconds * 1000
                     mem.set(row.domain, ms)
                     this.state.timeSpentToday += ms
                     return mem
                 }, new Map())
-                console.log("Loaded previous time data.");
+
+                if (this.state.today === data.date) {
+                    console.log("Loaded previous time data from today.");
+                    this.timedata = timedata
+                } else {
+                    this.archive(data.timearray, data.date)
+                }
             }
+
             data.settings && this.updateSettings(data.settings)
             this.siteconfigs = (data.siteconfigsarray || []).reduce((mem, site) => {
                 mem.set(site.domain, {...site.settings})
@@ -57,7 +64,7 @@ class Timer {
                     getActiveDomain().then(domain => this.update(domain))
                 }, this.updateInterval)
                 this.state.saveIntervalId = setInterval(() => {
-                    this.state.idle || this.save().then(res => console.log("Saved time data"))
+                    this.state.idle || this.save()
                     .catch(err => console.log(err))
                 }, this.saveInterval)
                 console.log("Timer initialized. Domain: " + domain);
@@ -75,35 +82,35 @@ class Timer {
         })
     }
 
-    save() {
-        const timearray = timemap2timearray(this.timedata)
-
-        if (this.state.today === this.state.timestamp.toLocaleDateString()) {
+    archive(timearray, date) {
+        return browser.storage.local.get("archive").then(data => {
+            const archive = data.archive || []
+            if (archive.length > 0 && archive[archive.length].date === this.state.today) {
+                archive.push({
+                    timearray,
+                    date
+                })
+            }
+            console.log("Archived data.");
             return browser.storage.local.set({
-                timearray,
+                archive
+            })
+        })
+    }
+
+    save() {
+        if (this.state.today === this.state.timestamp.toLocaleDateString()) {
+            console.log("Saved time data")
+            browser.storage.local.set({
+                timearray: timemap2timearray(this.timedata),
                 date: this.state.today
             })
         } else {
-            return browser.storage.local.get("archive").then(data => {
-                const archive = data.archive || []
-                archive.push({
-                    timearray,
-                    date: this.state.today
-                })
-                this.state.today = this.state.timestamp.toLocaleDateString()
-                this.timedata = new Map()
-                return browser.storage.local.set({
-                    archive
-                })
-            })
+            console.log("New day! Resetting...");
+            this.archive(timemap2timearray(this.timedata), this.state.today)
+            this.state.today = this.state.timestamp.toLocaleDateString()
+            this.timedata = new Map()
         }
-    }
-
-    halt() {
-        this.stopTimer()
-        clearInterval(this.state.updateIntervalId)
-        clearInterval(this.state.saveIntervalId)
-        console.log("Timer halted");
     }
 
     onIdle() {
@@ -223,3 +230,5 @@ browser.runtime.onMessage.addListener((req, sender, sendRes) => {
         })
     }
 })
+
+browser.idle.setDetectionInterval(300) // in seconds
