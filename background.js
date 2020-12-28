@@ -113,13 +113,6 @@ class Timer {
         }
     }
 
-    halt() {
-        this.stopTimer()
-        clearInterval(this.state.updateIntervalId)
-        clearInterval(this.state.saveIntervalId)
-        console.log("Timer halted");
-    }
-
     onIdle() {
         if (this.siteconfigs.has(this.state.currentDomain) &&
             this.siteconfigs.get(this.state.currentDomain).idleIgnore
