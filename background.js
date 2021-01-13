@@ -113,11 +113,6 @@ class Timer {
     }
 
     onIdle() {
-        if (this.siteconfigs.has(this.state.currentDomain) &&
-            this.siteconfigs.get(this.state.currentDomain).idleIgnore
-        ) {
-            return
-        }
         if (!this.state.idle) {
             this.stopTimer()
             this.state.idle = true
@@ -200,7 +195,11 @@ browser.windows.onFocusChanged.addListener(windowId => {
 browser.idle.onStateChanged.addListener(idleState => {
     console.log("Browser state changed to : " + idleState);
     timer.state.browserActive = idleState === "active"
-    if (!timer.state.browserActive) {
+    if (
+        !timer.state.browserActive &&
+        timer.siteconfigs.has(timer.state.currentDomain) &&
+        timer.siteconfigs.get(timer.state.currentDomain).idleIgnore
+    ) {
         timer.onIdle()
     } else if (timer.state.idle && timer.state.windowActive) {
         timer.onActive()
